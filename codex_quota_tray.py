@@ -118,6 +118,37 @@ def clamp_overlay_position(x, y, width, height, work_areas):
     return 12, 12
 
 
+def snap_overlay_to_corner(x, y, width, height, work_areas, threshold=20):
+    x, y, width, height = int(x), int(y), int(width), int(height)
+    if not work_areas:
+        return x, y
+
+    def overlap_area(area):
+        left, top, right, bottom = area
+        overlap_width = max(0, min(x + width, right) - max(x, left))
+        overlap_height = max(0, min(y + height, bottom) - max(y, top))
+        return overlap_width * overlap_height
+
+    target_area = max(work_areas, key=overlap_area)
+    if overlap_area(target_area) == 0:
+        return x, y
+    left, top, right, bottom = target_area
+    corners = (
+        (left, top),
+        (right - width, top),
+        (left, bottom - height),
+        (right - width, bottom - height),
+    )
+    matches = [
+        corner
+        for corner in corners
+        if abs(x - corner[0]) <= threshold and abs(y - corner[1]) <= threshold
+    ]
+    if not matches:
+        return x, y
+    return min(matches, key=lambda corner: (x - corner[0]) ** 2 + (y - corner[1]) ** 2)
+
+
 def get_font(size):
     for fp in FONT_PATHS:
         if os.path.exists(fp):
@@ -428,6 +459,7 @@ SW_SHOW = 5
 SW_SHOWNA = 8
 SWP_NOSIZE = 0x0001
 SWP_NOMOVE = 0x0002
+SWP_NOZORDER = 0x0004
 SWP_NOACTIVATE = 0x0010
 HWND_TOPMOST = -1
 HWND_NOTOPMOST = -2
@@ -913,7 +945,24 @@ def _overlay_persist_position(self):
         return
     rect = wintypes.RECT()
     if _u.GetWindowRect(self.hwnd, ctypes.byref(rect)):
-        self.x, self.y = rect.left, rect.top
+        width, height = rect.right - rect.left, rect.bottom - rect.top
+        self.x, self.y = snap_overlay_to_corner(
+            rect.left,
+            rect.top,
+            width,
+            height,
+            _monitor_work_areas(),
+        )
+        if (self.x, self.y) != (rect.left, rect.top):
+            _u.SetWindowPos(
+                self.hwnd,
+                None,
+                self.x,
+                self.y,
+                0,
+                0,
+                SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE,
+            )
         self._persist("x", self.x)
         self._persist("y", self.y)
 

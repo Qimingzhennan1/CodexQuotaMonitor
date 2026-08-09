@@ -62,6 +62,30 @@ class QuotaStateTests(unittest.TestCase):
 
 
 class OverlayLogicTests(unittest.TestCase):
+    def test_corner_snap_preserves_free_positions_and_uses_current_monitor(self):
+        try:
+            snap = app.snap_overlay_to_corner
+        except AttributeError as error:
+            self.fail(f"corner snapping is not implemented: {error}")
+
+        area = [(0, 0, 1920, 1040)]
+        cases = (
+            ((12, 8), (0, 0)),
+            ((1608, 8), (1620, 0)),
+            ((12, 932), (0, 940)),
+            ((1608, 932), (1620, 940)),
+            ((8, 400), (8, 400)),
+            ((21, 10), (21, 10)),
+        )
+        for position, expected in cases:
+            with self.subTest(position=position):
+                self.assertEqual(snap(*position, 300, 100, area), expected)
+
+        self.assertEqual(
+            snap(1910, 8, 300, 100, [(0, 0, 1920, 1040), (1920, 0, 3200, 720)]),
+            (1920, 0),
+        )
+
     def test_overlay_menu_labels_are_compact(self):
         try:
             labels = app.overlay_menu_labels("vertical", "green")
