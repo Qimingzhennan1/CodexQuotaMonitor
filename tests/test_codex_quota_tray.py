@@ -62,6 +62,23 @@ class QuotaStateTests(unittest.TestCase):
 
 
 class OverlayLogicTests(unittest.TestCase):
+    def test_overlay_menu_labels_are_compact(self):
+        try:
+            labels = app.overlay_menu_labels("vertical", "green")
+        except AttributeError as error:
+            self.fail(f"compact overlay menu is not implemented: {error}")
+
+        self.assertEqual(
+            labels,
+            (
+                "样式: 紧凑竖版",
+                "配色: 绿色",
+                "调整透明度…",
+                "鼠标穿透",
+                "隐藏悬浮窗",
+            ),
+        )
+
     def test_layout_cycle_visits_all_three_layouts(self):
         self.assertEqual(app.next_layout("full"), "micro")
         self.assertEqual(app.next_layout("micro"), "vertical")

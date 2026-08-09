@@ -943,33 +943,46 @@ def _overlay_stop(self):
         thread.join(timeout=2)
 
 
+def overlay_menu_labels(layout, accent_color):
+    layout_labels = {
+        "full": "完整横版",
+        "micro": "极简横条",
+        "vertical": "紧凑竖版",
+    }
+    color_labels = {
+        "green": "绿色",
+        "cyan": "青色",
+        "orange": "橙色",
+        "white": "白色",
+    }
+    return (
+        f"样式: {layout_labels.get(layout, layout_labels['full'])}",
+        f"配色: {color_labels.get(accent_color, color_labels['green'])}",
+        "调整透明度…",
+        "鼠标穿透",
+        "隐藏悬浮窗",
+    )
+
+
 def _overlay_context_menu(self):
     if not self.hwnd or self.click_through:
         return
     menu = _u.CreatePopupMenu()
-    commands = {101: "full", 102: "micro", 103: "vertical"}
-    labels = {"full": "完整横版", "micro": "极简横条", "vertical": "紧凑竖版"}
+    labels = overlay_menu_labels(self.layout, self.accent_color)
     try:
-        for command, layout_name in commands.items():
-            flags = MF_STRING | (MF_CHECKED if self.layout == layout_name else 0)
-            _u.AppendMenuW(menu, flags, command, labels[layout_name])
+        _u.AppendMenuW(menu, MF_STRING, 101, labels[0])
+        _u.AppendMenuW(menu, MF_STRING, 121, labels[1])
+        _u.AppendMenuW(menu, MF_STRING, 123, labels[2])
         _u.AppendMenuW(menu, MF_SEPARATOR, 0, None)
-        color_labels = {"green": "绿色", "cyan": "青色", "orange": "橙色", "white": "白色"}
-        _u.AppendMenuW(menu, MF_STRING, 121, f"配色: {color_labels[self.accent_color]}")
-        _u.AppendMenuW(menu, MF_STRING, 123, "调整透明度…")
-        _u.AppendMenuW(menu, MF_SEPARATOR, 0, None)
-        _u.AppendMenuW(menu, MF_STRING | (MF_CHECKED if self.topmost else 0), 110, "始终置顶")
-        _u.AppendMenuW(menu, MF_STRING, 111, "开启鼠标穿透")
-        _u.AppendMenuW(menu, MF_STRING, 112, "隐藏悬浮窗")
+        _u.AppendMenuW(menu, MF_STRING, 111, labels[3])
+        _u.AppendMenuW(menu, MF_STRING, 112, labels[4])
         point = wintypes.POINT()
         _u.GetCursorPos(ctypes.byref(point))
         command = _u.TrackPopupMenu(
             menu, TPM_RETURNCMD | TPM_RIGHTBUTTON, point.x, point.y, 0, self.hwnd, None
         )
-        if command in commands:
-            self.set_layout(commands[command])
-        elif command == 110:
-            self.set_topmost(not self.topmost)
+        if command == 101:
+            self.cycle_layout()
         elif command == 111:
             self.set_click_through(True)
         elif command == 112:
@@ -1267,27 +1280,41 @@ def main():
             ),
         ),
         MenuItem(
-            "配色",
-            appearance_menu(
-                "accent_color",
-                (("green", "绿色"), ("cyan", "青色"), ("orange", "橙色"), ("white", "白色")),
+            "外观",
+            Menu(
+                MenuItem(
+                    "配色",
+                    appearance_menu(
+                        "accent_color",
+                        (("green", "绿色"), ("cyan", "青色"), ("orange", "橙色"), ("white", "白色")),
+                    ),
+                ),
+                MenuItem("调整透明度…", show_opacity_slider),
             ),
-        ),
-        MenuItem("调整透明度…", show_opacity_slider),
-        MenuItem(
-            lambda item: "始终置顶: 开" if overlay and overlay.topmost else "始终置顶: 关",
-            toggle_topmost,
         ),
         MenuItem(
             lambda item: "鼠标穿透: 开" if overlay and overlay.click_through else "鼠标穿透: 关",
             toggle_click_through,
         ),
-        MenuItem(
-            lambda item: "显示口径: 可用" if SHOW_MODE == "free" else "显示口径: 已用",
-            toggle_mode,
-        ),
         MenuItem("刷新", refresh_now),
-        MenuItem(lambda item: "开机启动: 开" if startup_enabled() else "开机启动: 关", toggle_startup),
+        MenuItem(
+            "更多设置",
+            Menu(
+                MenuItem(
+                    lambda item: "始终置顶: 开" if overlay and overlay.topmost else "始终置顶: 关",
+                    toggle_topmost,
+                ),
+                MenuItem(
+                    lambda item: "显示口径: 可用" if SHOW_MODE == "free" else "显示口径: 已用",
+                    toggle_mode,
+                ),
+                MenuItem(
+                    lambda item: "开机启动: 开" if startup_enabled() else "开机启动: 关",
+                    toggle_startup,
+                ),
+            ),
+        ),
+        Menu.SEPARATOR,
         MenuItem("退出", quit_app),
         MenuItem("", on_icon_activate, default=True, visible=False),
     )
